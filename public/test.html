@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chatbot Widget Test Page</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+      background: linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #1e1b4b 100%);
+      min-height: 100vh;
+      color: white;
+    }
+    
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 60px 20px;
+    }
+    
+    h1 {
+      font-size: 3rem;
+      font-weight: 700;
+      margin-bottom: 16px;
+      background: linear-gradient(to right, #c7d2fe, #a5b4fc);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    
+    .subtitle {
+      font-size: 1.25rem;
+      color: #a5b4fc;
+      margin-bottom: 40px;
+    }
+    
+    .card {
+      background: rgba(255, 255, 255, 0.1);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 16px;
+      padding: 32px;
+      margin-bottom: 24px;
+    }
+    
+    .card h2 {
+      font-size: 1.5rem;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    
+    .card h2::before {
+      content: '✨';
+    }
+    
+    .card p {
+      color: #c7d2fe;
+      line-height: 1.6;
+    }
+    
+    .steps {
+      display: grid;
+      gap: 16px;
+      margin-top: 24px;
+    }
+    
+    .step {
+      display: flex;
+      gap: 16px;
+      align-items: flex-start;
+    }
+    
+    .step-number {
+      width: 32px;
+      height: 32px;
+      background: linear-gradient(135deg, #6366f1, #8b5cf6);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 600;
+      font-size: 14px;
+      flex-shrink: 0;
+    }
+    
+    .step-content h3 {
+      font-size: 1.1rem;
+      margin-bottom: 4px;
+    }
+    
+    .step-content p {
+      font-size: 0.9rem;
+      color: #a5b4fc;
+    }
+    
+    .highlight {
+      display: inline-block;
+      background: rgba(99, 102, 241, 0.3);
+      padding: 2px 8px;
+      border-radius: 6px;
+      font-family: monospace;
+      font-size: 0.9em;
+    }
+    
+    .arrow {
+      display: inline-block;
+      margin-left: 8px;
+      animation: bounce 1s infinite;
+    }
+    
+    @keyframes bounce {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(5px); }
+    }
+    
+    .sample-content {
+      margin-top: 40px;
+      padding: 24px;
+      background: rgba(0, 0, 0, 0.2);
+      border-radius: 12px;
+    }
+    
+    .sample-content h3 {
+      margin-bottom: 16px;
+      color: #a5b4fc;
+    }
+    
+    .sample-content p {
+      line-height: 1.8;
+      color: #e0e7ff;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Chatbot Widget Test</h1>
+    <p class="subtitle">Your AI assistant is ready to chat in the bottom right corner <span class="arrow">↓</span></p>
+    
+    <div class="card">
+      <h2>How to Test</h2>
+      <div class="steps">
+        <div class="step">
+          <div class="step-number">1</div>
+          <div class="step-content">
+            <h3>Click the chat button</h3>
+            <p>Look for the floating button in the <span class="highlight">bottom-right</span> corner</p>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-number">2</div>
+          <div class="step-content">
+            <h3>Start a conversation</h3>
+            <p>Type a message and press Enter or click send</p>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-number">3</div>
+          <div class="step-content">
+            <h3>Get AI responses</h3>
+            <p>Your chatbot will respond using the configured LLM</p>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="sample-content">
+      <h3>📄 Sample Page Content</h3>
+      <p>
+        This is a sample page demonstrating how the chatbot widget works when embedded on any website. 
+        The widget loads asynchronously and doesn't affect page performance. It fetches its configuration 
+        from your Supabase database and connects to your chosen LLM provider (OpenAI, Claude, or Gemini) 
+        to provide intelligent responses.
+      </p>
+      <p style="margin-top: 16px;">
+        Try asking the chatbot questions about anything! The system prompt you configured will guide 
+        its responses and personality.
+      </p>
+    </div>
+  </div>
+  
+  <script>
+    // Get chatbot ID from URL query parameter
+    const urlParams = new URLSearchParams(window.location.search);
+    const chatbotId = urlParams.get('chatbot');
+    
+    if (chatbotId) {
+      // Dynamically load the widget script
+      const script = document.createElement('script');
+      script.src = '/widget.js';
+      script.setAttribute('data-chatbot-id', chatbotId);
+      script.async = true;
+      document.body.appendChild(script);
+    } else {
+      // Show error message
+      const container = document.querySelector('.container');
+      const errorCard = document.createElement('div');
+      errorCard.className = 'card';
+      errorCard.style.borderColor = 'rgba(239, 68, 68, 0.5)';
+      errorCard.style.background = 'rgba(239, 68, 68, 0.1)';
+      errorCard.innerHTML = `
+        <h2 style="color: #fca5a5;">⚠️ Missing Chatbot ID</h2>
+        <p style="color: #fecaca;">
+          No chatbot ID was provided in the URL. Make sure to access this page through the 
+          "Test Widget" button on your chatbot's detail page, or add <span class="highlight">?chatbot=YOUR_ID</span> 
+          to the URL.
+        </p>
+      `;
+      container.insertBefore(errorCard, container.firstChild.nextSibling.nextSibling);
+    }
+  </script>
+</body>
+</html>
