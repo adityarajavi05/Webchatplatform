@@ -186,7 +186,13 @@ export async function POST(req: NextRequest) {
             let ragContext = '';
             try {
                 const { searchSimilarChunks } = await import('@/lib/document-processor');
-                const relevantChunks = await searchSimilarChunks(chatbot.id, message, 5);
+                const relevantChunks = await searchSimilarChunks(
+                    chatbot.id, 
+                    message, 
+                    5,
+                    decryptedApiKey,
+                    chatbot.llm_provider
+                );
 
                 if (relevantChunks.length > 0) {
                     ragContext = '\n\n### Relevant Knowledge Base Context:\n' +

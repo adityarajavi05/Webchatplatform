@@ -1,5 +1,6 @@
 import { supabaseAdmin } from '@/lib/supabase';
 import mammoth from 'mammoth';
+import { decrypt } from './crypto';
 
 // Import will be dynamically loaded to avoid issues with SSR
 let pipeline: any = null;
@@ -18,6 +19,29 @@ async function getEmbeddingPipeline() {
     }
 
     return embeddingModel;
+}
+
+// Generate embedding using OpenAI (1536 dimensions)
+async function generateOpenAIEmbedding(text: string, apiKey: string): Promise<number[]> {
+    const response = await fetch('https://api.openai.com/v1/embeddings', {
+        method: 'POST',
+        headers: {
+            'Authorization': `Bearer ${apiKey}`,
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            model: 'text-embedding-3-small', // 1536 dimensions
+            input: text
+        })
+    });
+
+    if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error?.message || 'OpenAI embedding API error');
+    }
+
+    const data = await response.json();
+    return data.data[0].embedding;
 }
 
 // Extract text from different file types
@@ -113,12 +137,21 @@ function chunkText(text: string, chunkSize: number = 500, overlap: number = 50):
 }
 
 // Generate embedding for a text chunk
-async function generateEmbedding(text: string): Promise<number[]> {
+// Uses OpenAI if apiKey and provider are provided (1536 dims), otherwise falls back to local model (384 dims)
+async function generateEmbedding(text: string, apiKey?: string, provider?: string): Promise<number[]> {
+    // Use OpenAI embeddings if API key and provider are available (matches database 1536 dimensions)
+    if (apiKey && provider === 'openai') {
+        try {
+            return await generateOpenAIEmbedding(text, apiKey);
+        } catch (error) {
+            console.warn('OpenAI embedding failed, falling back to local model:', error);
+            // Fall through to local model
+        }
+    }
+
+    // Fallback to local model (384 dimensions - note: database must match!)
     const model = await getEmbeddingPipeline();
-
     const output = await model(text, { pooling: 'mean', normalize: true });
-
-    // Convert to array
     return Array.from(output.data);
 }
 
@@ -131,6 +164,25 @@ export async function processDocument(
 ): Promise<void> {
     try {
         console.log(`Processing document ${documentId}...`);
+
+        // Get chatbot to retrieve API key and provider for embeddings
+        const { data: chatbot, error: chatbotError } = await supabaseAdmin
+            .from('chatbots')
+            .select('api_key, llm_provider')
+            .eq('id', chatbotId)
+            .single();
+
+        if (chatbotError || !chatbot) {
+            throw new Error('Chatbot not found');
+        }
+
+        // Decrypt API key if available
+        let decryptedApiKey: string | undefined;
+        try {
+            decryptedApiKey = decrypt(chatbot.api_key);
+        } catch (e) {
+            console.warn('Could not decrypt API key, will use local embeddings:', e);
+        }
 
         // Update status to processing
         await supabaseAdmin
@@ -163,7 +215,7 @@ export async function processDocument(
             const chunk = chunks[i];
             console.log(`Generating embedding for chunk ${i + 1}/${chunks.length}`);
 
-            const embedding = await generateEmbedding(chunk);
+            const embedding = await generateEmbedding(chunk, decryptedApiKey, chatbot.llm_provider);
 
             chunkRecords.push({
                 document_id: documentId,
@@ -224,11 +276,13 @@ export async function processDocument(
 export async function searchSimilarChunks(
     chatbotId: string,
     query: string,
-    topK: number = 5
+    topK: number = 5,
+    apiKey?: string,
+    provider?: string
 ): Promise<{ content: string; similarity: number; page_url?: string; page_title?: string; source_type?: string }[]> {
     try {
-        // Generate embedding for the query
-        const queryEmbedding = await generateEmbedding(query);
+        // Generate embedding for the query (use same method as document embeddings)
+        const queryEmbedding = await generateEmbedding(query, apiKey, provider);
 
         // Try the new function with source metadata first
         const { data, error } = await supabaseAdmin.rpc('search_similar_chunks_with_source', {
@@ -299,6 +353,22 @@ export async function processWebsitePage(
 
         console.log(`Created ${chunks.length} chunks for ${url}`);
 
+        // Get chatbot to retrieve API key and provider for embeddings
+        const { data: chatbot } = await supabaseAdmin
+            .from('chatbots')
+            .select('api_key, llm_provider')
+            .eq('id', chatbotId)
+            .single();
+
+        let decryptedApiKey: string | undefined;
+        if (chatbot?.api_key) {
+            try {
+                decryptedApiKey = decrypt(chatbot.api_key);
+            } catch (e) {
+                console.warn('Could not decrypt API key for website page:', e);
+            }
+        }
+
         // Generate embeddings and store chunks
         const chunkRecords = [];
 
@@ -306,7 +376,7 @@ export async function processWebsitePage(
             const chunk = chunks[i];
             console.log(`Generating embedding for chunk ${i + 1}/${chunks.length} of ${url}`);
 
-            const embedding = await generateEmbedding(chunk);
+            const embedding = await generateEmbedding(chunk, decryptedApiKey, chatbot?.llm_provider);
 
             chunkRecords.push({
                 chatbot_id: chatbotId,
