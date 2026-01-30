@@ -87,9 +87,19 @@ export async function POST(request: NextRequest) {
         }
 
         // Decrypt the API key
-        const apiKey = decrypt(chatbot.api_key);
+        let apiKey: string;
+        try {
+            apiKey = decrypt(chatbot.api_key);
+        } catch (decryptError: any) {
+            console.error('Intent API: decrypt failed', decryptError);
+            return NextResponse.json(
+                { error: 'Failed to read chatbot API key. Please re-save the chatbot API key in settings.' },
+                { status: 400 }
+            );
+        }
+
         const provider = chatbot.llm_provider || 'openai';
-        const model = chatbot.model_name || 'gpt-4.1-mini';
+        const model = chatbot.model_name || 'gpt-4o-mini';
 
         // Check if intents already exist
         const existingIntents = await getIntentsForChatbot(chatbotId);
@@ -151,15 +161,18 @@ export async function POST(request: NextRequest) {
     } catch (error: any) {
         console.error('Error detecting intents:', error);
 
-        if (error?.status === 401) {
+        const message = error?.message || error?.error?.message || 'Failed to detect intents';
+        const status = error?.status === 401 ? 401 : 500;
+
+        if (status === 401) {
             return NextResponse.json(
-                { error: 'Invalid API key. Please check your OpenAI API key in Settings.' },
+                { error: 'Invalid API key. Please check your chatbot API key in the chatbot settings.' },
                 { status: 401 }
             );
         }
 
         return NextResponse.json(
-            { error: error.message || 'Failed to detect intents' },
+            { error: message },
             { status: 500 }
         );
     }

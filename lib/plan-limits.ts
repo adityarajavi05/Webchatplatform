@@ -2,22 +2,22 @@
 export const PLAN_LIMITS = {
     basic: {
         maxDocuments: 10,
-        maxTotalSize: 5 * 1024 * 1024, // 5MB
-        maxFileSize: 2 * 1024 * 1024,  // 2MB per file
-        maxWebsitePages: 20,           // Website pages limit
+        maxTotalSize: 20 * 1024 * 1024, // 20MB
+        maxFileSize: 5 * 1024 * 1024,  // 2MB per file
+        maxWebsitePages: 50,           // Website pages limit
         label: 'Basic'
     },
     pro: {
         maxDocuments: 15,
-        maxTotalSize: 15 * 1024 * 1024, // 15MB
-        maxFileSize: 5 * 1024 * 1024,   // 5MB per file
+        maxTotalSize: 30 * 1024 * 1024, // 30MB
+        maxFileSize: 10 * 1024 * 1024,   // 10MB per file
         maxWebsitePages: 100,           // Website pages limit
         label: 'Pro'
     },
     enterprise: {
         maxDocuments: 30,
         maxTotalSize: 50 * 1024 * 1024, // 50MB
-        maxFileSize: 10 * 1024 * 1024,  // 10MB per file
+        maxFileSize: 15 * 1024 * 1024,  // 15MB per file
         maxWebsitePages: 500,           // Website pages limit
         label: 'Enterprise'
     }

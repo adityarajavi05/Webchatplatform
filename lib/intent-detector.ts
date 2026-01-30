@@ -62,7 +62,7 @@ export async function detectIntentsFromContent(
     content: string,
     apiKey: string,
     provider: string = 'openai',
-    model: string = 'gpt-4.1-mini',
+    model: string = 'gpt-4o-mini',
     maxIntents: number = 10
 ): Promise<DetectedIntent[]> {
     const { callLLM } = await import('@/lib/llm');
@@ -115,7 +115,7 @@ export async function classifyMessageIntent(
     intents: StoredIntent[],
     apiKey: string,
     provider: string = 'openai',
-    model: string = 'gpt-4.1-mini'
+    model: string = 'gpt-4o-mini'
 ): Promise<string | null> {
     if (intents.length === 0) return null;
 
@@ -174,8 +174,8 @@ export async function storeIntents(
     const records = intents.map((intent, index) => ({
         chatbot_id: chatbotId,
         name: intent.name,
-        description: intent.description,
-        keywords: intent.keywords,
+        description: intent.description || '',
+        keywords: Array.isArray(intent.keywords) ? intent.keywords : [],
         color: colors[index % colors.length],
         is_active: true
     }));
@@ -216,6 +216,34 @@ export async function getIntentsForChatbot(chatbotId: string): Promise<StoredInt
  * Delete all intents for a chatbot (for re-detection)
  */
 export async function clearIntentsForChatbot(chatbotId: string): Promise<void> {
+    // First, get all intent IDs for this chatbot
+    const { data: intents, error: fetchError } = await supabaseAdmin
+        .from('chatbot_intents')
+        .select('id')
+        .eq('chatbot_id', chatbotId);
+
+    if (fetchError) {
+        console.error('Failed to fetch intents for clearing:', fetchError);
+        throw fetchError;
+    }
+
+    if (intents && intents.length > 0) {
+        const intentIds = intents.map(i => i.id);
+
+        // Set detected_intent_id to NULL in messages that reference these intents
+        // This prevents foreign key constraint violations
+        const { error: updateError } = await supabaseAdmin
+            .from('messages')
+            .update({ detected_intent_id: null })
+            .in('detected_intent_id', intentIds);
+
+        if (updateError) {
+            console.error('Failed to clear intent references in messages:', updateError);
+            throw updateError;
+        }
+    }
+
+    // Now safe to delete the intents
     const { error } = await supabaseAdmin
         .from('chatbot_intents')
         .delete()
@@ -272,7 +300,7 @@ export async function triggerIntentDetection(chatbotId: string): Promise<void> {
     const { decrypt } = await import('@/lib/crypto');
     const apiKey = decrypt(chatbot.api_key);
     const provider = chatbot.llm_provider || 'openai';
-    const model = chatbot.model_name || 'gpt-4.1-mini';
+    const model = chatbot.model_name || 'gpt-4o-mini';
 
     // Clear existing intents for fresh detection
     await clearIntentsForChatbot(chatbotId);
