@@ -1,15 +1,10 @@
-import { createClient } from '@supabase/supabase-js';
 import { NextRequest, NextResponse } from 'next/server';
-
-const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+import { supabaseAdmin } from '@/lib/supabase';
 
 // GET - Fetch all prompts
 export async function GET() {
     try {
-        const { data, error } = await supabase
+        const { data, error } = await supabaseAdmin
             .from('prompts')
             .select('*')
             .order('created_at', { ascending: false });
@@ -39,7 +34,7 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        const { data, error } = await supabase
+        const { data, error } = await supabaseAdmin
             .from('prompts')
             .insert({
                 title,
@@ -73,7 +68,7 @@ export async function DELETE(request: NextRequest) {
             return NextResponse.json({ error: 'Prompt ID is required' }, { status: 400 });
         }
 
-        const { error } = await supabase
+        const { error } = await supabaseAdmin
             .from('prompts')
             .delete()
             .eq('id', id);
