@@ -1202,40 +1202,37 @@
     const container = document.createElement('div');
     container.className = 'chatbot-widget-container';
     container.innerHTML = `
-      <div class="chatbot-panel ${isOpen ? 'open' : ''}" id="chatbot-panel">
-        <div class="chatbot-header">
-          <div class="chatbot-header-icon">
-            <svg viewBox="0 0 24 24">
-              <path d="M12 2C6.48 2 2 6.48 2 12c0 1.54.36 2.98.97 4.29L1 23l6.71-1.97C9.02 21.64 10.46 22 12 22c5.52 0 10-4.48 10-10S17.52 2 12 2zm0 18c-1.4 0-2.74-.36-3.95-1.02l-.28-.17-2.91.86.86-2.91-.17-.28A7.937 7.937 0 014 12c0-4.42 3.58-8 8-8s8 3.58 8 8-3.58 8-8 8zm4.25-5.84c-.23-.12-1.36-.67-1.57-.75s-.36-.12-.52.12-.6.75-.73.9-.27.17-.5.06c-.23-.12-.97-.36-1.85-1.14-.68-.61-1.14-1.36-1.28-1.59s-.01-.35.1-.47c.1-.1.23-.27.35-.4s.16-.23.23-.38.04-.29-.02-.4c-.06-.12-.52-1.26-.71-1.73-.19-.45-.38-.39-.52-.39h-.45c-.16 0-.4.06-.61.29s-.8.78-.8 1.9.82 2.21.93 2.36c.12.16 1.61 2.46 3.91 3.45.55.24.97.38 1.31.48.55.17 1.05.15 1.44.09.44-.07 1.36-.56 1.55-1.1s.19-.99.13-1.09c-.06-.1-.22-.16-.45-.28z"/>
-            </svg>
-          </div>
-          <div class="chatbot-header-info">
-            <h3>${config?.name || 'Chat Assistant'}</h3>
-            <p>${config?.header_subtitle || 'Powered by AI'}</p>
-          </div>
+      <div class="chatbot-panel ${isOpen ? 'open' : ''}" id="chatbot-panel" style="height:700px;">
+      <div class="chatbot-header" style="padding: 28px 24px; min-height: 100px;">
+      <div class="chatbot-header-icon" style="width:56px;height:56px;">
+      <img src="/Rivert-Logo.png" alt="Logo" style="width:48px;height:48px;object-fit:contain;border-radius:10px;background:#fff;padding:2px;" />
         </div>
-        <div class="chatbot-messages" id="chatbot-messages">
-          ${config?.welcome_message ? `<div class="chatbot-message bot">${markdownToHtml(config.welcome_message)}</div>` : ''}
-        </div>
-        <div class="chatbot-input-area">
-          <input 
-            type="text" 
-            class="chatbot-input" 
-            id="chatbot-input" 
-            placeholder="Type a message..."
-            autocomplete="off"
-          />
-          <button class="chatbot-send" id="chatbot-send">
-            <svg viewBox="0 0 24 24">
-              <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
-            </svg>
-          </button>
+        <div class="chatbot-header-info">
+        <h3>${config?.name || 'Chat Assistant'}</h3>
         </div>
       </div>
+      <div class="chatbot-messages" id="chatbot-messages">
+      ${config?.welcome_message ? `<div class="chatbot-message bot">${markdownToHtml(config.welcome_message)}</div>` : ''}
+      </div>
+      <div class="chatbot-input-area">
+      <input 
+      type="text" 
+      class="chatbot-input" 
+      id="chatbot-input" 
+      placeholder="Type a message..."
+      autocomplete="off"
+      />
+      <button class="chatbot-send" id="chatbot-send">
+      <svg viewBox="0 0 24 24">
+        <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+      </svg>
+      </button>
+      </div>
+      </div>
       <button class="chatbot-button ${isOpen ? 'open' : ''}" id="chatbot-toggle">
-        <svg viewBox="0 0 24 24" id="chatbot-icon">
-          <path d="M12 2C6.48 2 2 6.48 2 12c0 1.54.36 2.98.97 4.29L1 23l6.71-1.97C9.02 21.64 10.46 22 12 22c5.52 0 10-4.48 10-10S17.52 2 12 2zm0 18c-1.4 0-2.74-.36-3.95-1.02l-.28-.17-2.91.86.86-2.91-.17-.28A7.937 7.937 0 014 12c0-4.42 3.58-8 8-8s8 3.58 8 8-3.58 8-8 8z"/>
-        </svg>
+      <svg viewBox="0 0 24 24" id="chatbot-icon">
+      <path d="M12 2C6.48 2 2 6.48 2 12c0 1.54.36 2.98.97 4.29L1 23l6.71-1.97C9.02 21.64 10.46 22 12 22c5.52 0 10-4.48 10-10S17.52 2 12 2zm0 18c-1.4 0-2.74-.36-3.95-1.02l-.28-.17-2.91.86.86-2.91-.17-.28A7.937 7.937 0 014 12c0-4.42 3.58-8 8-8s8 3.58 8 8-3.58 8-8 8z"/>
+      </svg>
       </button>
     `;
     document.body.appendChild(container);

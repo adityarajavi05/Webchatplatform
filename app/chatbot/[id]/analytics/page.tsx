@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 
@@ -101,32 +101,44 @@ export default function AnalyticsPage() {
     }
 
     function processAnalytics(convs: Conversation[], evts: WidgetEvent[]) {
-        // Peak engagement hours: use widget_events first, fallback to message/conversation timestamps
+        // Peak engagement hours: combine widget_events AND conversation/message timestamps
         const hourCounts: Record<number, number> = {};
+
+        // Count widget events by hour
         evts.forEach(e => {
-            const hour = new Date(e.created_at).getHours();
-            hourCounts[hour] = (hourCounts[hour] || 0) + 1;
-        });
-        // If no or few events, derive from conversation/message timestamps so peak hour still works
-        const totalEventCount = Object.values(hourCounts).reduce((a, b) => a + b, 0);
-        if (totalEventCount < 5) {
-            convs.forEach(conv => {
-                const ts = conv.started_at || conv.created_at;
-                if (ts) {
-                    const hour = new Date(ts as string).getHours();
+            if (e.created_at) {
+                const hour = new Date(e.created_at).getHours();
+                if (!isNaN(hour)) {
                     hourCounts[hour] = (hourCounts[hour] || 0) + 1;
                 }
-                conv.messages?.forEach(msg => {
-                    const hour = new Date(msg.created_at).getHours();
+            }
+        });
+
+        // Always include conversation and message timestamps for better data
+        convs.forEach(conv => {
+            const ts = conv.started_at || conv.created_at;
+            if (ts) {
+                const hour = new Date(ts as string).getHours();
+                if (!isNaN(hour)) {
                     hourCounts[hour] = (hourCounts[hour] || 0) + 1;
-                });
+                }
+            }
+            conv.messages?.forEach(msg => {
+                if (msg.created_at) {
+                    const hour = new Date(msg.created_at).getHours();
+                    if (!isNaN(hour)) {
+                        hourCounts[hour] = (hourCounts[hour] || 0) + 1;
+                    }
+                }
             });
-        }
+        });
+
         const hourlyArr: HourlyData[] = Array.from({ length: 24 }, (_, i) => ({
             hour: i,
             count: hourCounts[i] || 0
         }));
         setHourlyData(hourlyArr);
+        console.log('hourlyArr:', hourlyArr, 'hourCounts:', hourCounts);
 
         // Word cloud from messages
         const wordCounts: Record<string, number> = {};
@@ -202,8 +214,17 @@ export default function AnalyticsPage() {
     const widgetOpens = events.filter(e => e.event_type === 'widget_opened').length;
     const widgetCloses = events.filter(e => e.event_type === 'widget_closed').length;
 
-    const peakHour = hourlyData.reduce((max, curr) => curr.count > max.count ? curr : max, { hour: 0, count: 0 });
-    const hasPeakData = peakHour.count > 0;
+    const { peakHour, hasPeakData } = useMemo(() => {
+        if (hourlyData.length === 0) {
+            return { peakHour: { hour: 0, count: 0 }, hasPeakData: false };
+        }
+        const peak = hourlyData.reduce((max, curr) => curr.count > max.count ? curr : max, { hour: 0, count: 0 });
+        return { peakHour: peak, hasPeakData: peak.count > 0 };
+    }, [hourlyData]);
+
+    console.log('hourlyData:', hourlyData);
+    console.log('peakHour:', peakHour);
+
 
     if (loading) {
         return (
@@ -337,29 +358,40 @@ export default function AnalyticsPage() {
                                     </svg>
                                     Peak Engagement Hours
                                 </h3>
-                                <div className="flex items-end gap-1 h-40">
+                                <div className="relative bg-white/5 rounded-lg" style={{ height: '150px' }}>
                                     {hourlyData.map((h, i) => {
                                         const maxCount = Math.max(...hourlyData.map(d => d.count), 1);
-                                        const height = maxCount > 0 ? (h.count / maxCount) * 100 : 0;
-                                        const isPeak = hasPeakData && h.hour === peakHour.hour && h.count > 0;
+                                        const heightPercent = (h.count / maxCount) * 100;
+                                        const isPeak = h.hour === peakHour.hour && h.count > 0;
                                         return (
-                                            <div key={i} className="flex-1 flex flex-col items-center group relative">
-                                                <div
-                                                    className={`w-full rounded-t transition-all ${isPeak ? 'bg-blue-500' : 'bg-blue-500/30 group-hover:bg-blue-500/50'}`}
-                                                    style={{ height: `${Math.max(height, 2)}%` }}
-                                                ></div>
-                                                {i % 4 === 0 && (
-                                                    <span className="text-xs text-gray-500 mt-1">{String(h.hour).padStart(2, '0')}:00</span>
-                                                )}
-                                                <div className="absolute bottom-full mb-2 bg-gray-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
-                                                    {h.count} {h.count === 1 ? 'event' : 'events'} at {String(h.hour).padStart(2, '0')}:00
+                                            <div
+                                                key={i}
+                                                className="absolute bottom-0 hover:opacity-80 transition-opacity group"
+                                                style={{
+                                                    left: `${(i / 24) * 100}%`,
+                                                    width: `${100 / 24 - 0.3}%`,
+                                                    height: `${Math.max(heightPercent, 3)}%`,
+                                                    backgroundColor: isPeak ? '#3b82f6' : '#3b82f680',
+                                                    borderRadius: '2px 2px 0 0',
+                                                }}
+                                                title={`${h.count} messages at ${String(h.hour).padStart(2, '0')}:00`}
+                                            >
+                                                <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-gray-900 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-20">
+                                                    {h.count} at {String(h.hour).padStart(2, '0')}:00
                                                 </div>
                                             </div>
                                         );
                                     })}
                                 </div>
+                                <div className="flex justify-between text-xs text-gray-500 mt-2">
+                                    <span>00:00</span>
+                                    <span>06:00</span>
+                                    <span>12:00</span>
+                                    <span>18:00</span>
+                                    <span>24:00</span>
+                                </div>
                                 {!hasPeakData && (
-                                    <p className="text-gray-500 text-sm mt-4 text-center">No engagement data yet. Chat with the widget or open it on your site to see peak hours.</p>
+                                    <p className="text-gray-500 text-sm mt-2 text-center">No engagement data yet</p>
                                 )}
                             </div>
 
@@ -521,7 +553,7 @@ export default function AnalyticsPage() {
                     </div>
                 )}
             </div>
-        </div>
+        </div >
     );
 }
 

@@ -264,12 +264,37 @@ export default function DashboardPage() {
         const abandonedConversations = convs.filter(c => c.status === 'closed' || c.status === 'abandoned').length;
         const openConversations = convs.filter(c => c.status === 'open' || !c.status).length;
 
-        // Peak engagement hours
+        // Peak engagement hours - include both events AND conversation/message timestamps
         const hourCounts: Record<number, number> = {};
+
+        // Count widget events
         evts.forEach(e => {
-            const hour = new Date(e.created_at).getHours();
-            hourCounts[hour] = (hourCounts[hour] || 0) + 1;
+            if (e.created_at) {
+                const hour = new Date(e.created_at).getHours();
+                if (!isNaN(hour)) {
+                    hourCounts[hour] = (hourCounts[hour] || 0) + 1;
+                }
+            }
         });
+
+        // Also include conversation and message timestamps for better data
+        convs.forEach(conv => {
+            if (conv.started_at) {
+                const hour = new Date(conv.started_at).getHours();
+                if (!isNaN(hour)) {
+                    hourCounts[hour] = (hourCounts[hour] || 0) + 1;
+                }
+            }
+            conv.messages?.forEach(msg => {
+                if (msg.created_at) {
+                    const hour = new Date(msg.created_at).getHours();
+                    if (!isNaN(hour)) {
+                        hourCounts[hour] = (hourCounts[hour] || 0) + 1;
+                    }
+                }
+            });
+        });
+
         const hourlyData: HourlyData[] = Array.from({ length: 24 }, (_, i) => ({
             hour: i,
             count: hourCounts[i] || 0
@@ -956,32 +981,43 @@ export default function DashboardPage() {
                         <div className="grid lg:grid-cols-2 gap-6 mb-8">
                             {/* Peak Engagement Hours */}
                             <div className="bg-white dark:bg-[#111] border border-gray-200 dark:border-white/5 rounded-2xl p-6">
-                                <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
                                     <svg className="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                                     </svg>
                                     Peak Engagement Hours
                                 </h3>
-                                <div className="flex items-end gap-1 h-40">
+                                <div className="relative bg-gray-100 dark:bg-white/5 rounded-lg" style={{ height: '150px' }}>
                                     {currentAnalytics?.hourlyData.map((h, i) => {
                                         const maxCount = Math.max(...(currentAnalytics?.hourlyData.map(d => d.count) || [1]), 1);
-                                        const height = (h.count / maxCount) * 100;
+                                        const heightPercent = (h.count / maxCount) * 100;
                                         const isPeak = h.hour === peakHour?.hour && h.count > 0;
                                         return (
-                                            <div key={i} className="flex-1 flex flex-col items-center group relative">
-                                                <div
-                                                    className={`w-full rounded-t transition-all ${isPeak ? 'bg-blue-500' : 'bg-blue-500/30 group-hover:bg-blue-500/50'}`}
-                                                    style={{ height: `${Math.max(height, 2)}%` }}
-                                                ></div>
-                                                {i % 4 === 0 && (
-                                                    <span className="text-xs text-gray-500 mt-1">{h.hour}:00</span>
-                                                )}
-                                                <div className="absolute bottom-full mb-2 bg-gray-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
-                                                    {h.count} events at {h.hour}:00
+                                            <div
+                                                key={i}
+                                                className="absolute bottom-0 hover:opacity-80 transition-opacity group"
+                                                style={{
+                                                    left: `${(i / 24) * 100}%`,
+                                                    width: `${100 / 24 - 0.3}%`,
+                                                    height: `${Math.max(heightPercent, 3)}%`,
+                                                    backgroundColor: isPeak ? '#3b82f6' : '#3b82f680',
+                                                    borderRadius: '2px 2px 0 0',
+                                                }}
+                                                title={`${h.count} messages at ${String(h.hour).padStart(2, '0')}:00`}
+                                            >
+                                                <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-gray-900 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-20">
+                                                    {h.count} at {String(h.hour).padStart(2, '0')}:00
                                                 </div>
                                             </div>
                                         );
                                     })}
+                                </div>
+                                <div className="flex justify-between text-xs text-gray-500 mt-2">
+                                    <span>00:00</span>
+                                    <span>06:00</span>
+                                    <span>12:00</span>
+                                    <span>18:00</span>
+                                    <span>24:00</span>
                                 </div>
                             </div>
 
