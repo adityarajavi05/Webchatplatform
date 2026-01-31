@@ -158,7 +158,8 @@ export async function POST(req: NextRequest) {
                 const briefResponse = escalationCheck.rule.brief_response ||
                     `I understand you have a question about ${escalationCheck.rule.name.toLowerCase().replace(/_/g, ' ')}.`;
 
-                botResponse = `${briefResponse}\n\nI'm not able to answer that accurately right now. I'm forwarding this to a human agent who can help. Please wait, someone will respond shortly.`;
+                botResponse = `${briefResponse}
+                \n\nI'm not able to answer that accurately right now. I'm forwarding this to a human agent who can help. Please wait, someone will respond shortly.`;
 
                 // Update conversation for human support
                 await supabaseAdmin
@@ -209,7 +210,15 @@ export async function POST(req: NextRequest) {
 
             // Augment system prompt with RAG context
             const augmentedSystemPrompt = ragContext
-                ? `${chatbot.system_prompt}\n\nUse the following knowledge base context to answer questions when relevant. When referencing information from specific pages, you can mention the page name to help users navigate:${ragContext}`
+                ? `${chatbot.system_prompt}\n\n
+               Use the following knowledge base context to answer questions when relevant. When referencing information from specific pages, you can mention the page name to help users navigate.
+
+                    **Response Guidelines:**
+                    - Keep responses brief and concise - provide only necessary information
+                    - Use bullet points (•) to structure information when presenting multiple items or steps
+                    - Avoid numbered lists unless specifically asked or when sequence/order matters
+                    - Don't elaborate excessively - answer directly and stop when the question is addressed
+                    - If a topic requires depth, provide a concise overview first, then offer to elaborate if needed${ragContext}`
                 : chatbot.system_prompt;
 
             // Call LLM

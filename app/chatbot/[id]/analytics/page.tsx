@@ -1,7 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { supabase } from '@/lib/supabase';
 import { useParams } from 'next/navigation';
 
 interface Chatbot {
@@ -20,6 +19,7 @@ interface Conversation {
     id: string;
     visitor_id: string;
     started_at: string;
+    created_at?: string;
     ended_at?: string;
     status: string;
     page_url?: string;
@@ -73,64 +73,55 @@ export default function AnalyticsPage() {
 
     async function fetchData() {
         setLoading(true);
-
-        // Calculate date filter
-        let dateFilter: string | null = null;
-        if (dateRange === '7d') {
-            dateFilter = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-        } else if (dateRange === '30d') {
-            dateFilter = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+        try {
+            const res = await fetch(
+                `/api/chatbot/${params.id}/analytics?dateRange=${dateRange}`,
+                { credentials: 'include' }
+            );
+            const data = await res.json();
+            if (!res.ok) {
+                console.error('Analytics fetch failed:', data);
+                setConversations([]);
+                setEvents([]);
+                processAnalytics([], []);
+                setLoading(false);
+                return;
+            }
+            setChatbot(data.chatbot);
+            setConversations(data.conversations || []);
+            setEvents(data.events || []);
+            processAnalytics(data.conversations || [], data.events || []);
+        } catch (err) {
+            console.error('Analytics fetch error:', err);
+            setConversations([]);
+            setEvents([]);
+            processAnalytics([], []);
         }
-
-        // Fetch chatbot
-        const { data: chatbotData } = await supabase
-            .from('chatbots')
-            .select('id, name')
-            .eq('id', params.id)
-            .single();
-
-        setChatbot(chatbotData);
-
-        // Fetch conversations with messages
-        let convQuery = supabase
-            .from('conversations')
-            .select('*, messages(*)')
-            .eq('chatbot_id', params.id)
-            .order('started_at', { ascending: false });
-
-        if (dateFilter) {
-            convQuery = convQuery.gte('started_at', dateFilter);
-        }
-
-        const { data: convData } = await convQuery.limit(100);
-        setConversations(convData || []);
-
-        // Fetch widget events
-        let eventsQuery = supabase
-            .from('widget_events')
-            .select('*')
-            .eq('chatbot_id', params.id)
-            .order('created_at', { ascending: false });
-
-        if (dateFilter) {
-            eventsQuery = eventsQuery.gte('created_at', dateFilter);
-        }
-
-        const { data: eventsData } = await eventsQuery.limit(500);
-        setEvents(eventsData || []);
-
-        // Process analytics data
-        processAnalytics(convData || [], eventsData || []);
         setLoading(false);
     }
 
     function processAnalytics(convs: Conversation[], evts: WidgetEvent[]) {
-        // Peak engagement hours
+        // Peak engagement hours: use widget_events first, fallback to message/conversation timestamps
         const hourCounts: Record<number, number> = {};
         evts.forEach(e => {
             const hour = new Date(e.created_at).getHours();
             hourCounts[hour] = (hourCounts[hour] || 0) + 1;
         });
+        // If no or few events, derive from conversation/message timestamps so peak hour still works
+        const totalEventCount = Object.values(hourCounts).reduce((a, b) => a + b, 0);
+        if (totalEventCount < 5) {
+            convs.forEach(conv => {
+                const ts = conv.started_at || conv.created_at;
+                if (ts) {
+                    const hour = new Date(ts as string).getHours();
+                    hourCounts[hour] = (hourCounts[hour] || 0) + 1;
+                }
+                conv.messages?.forEach(msg => {
+                    const hour = new Date(msg.created_at).getHours();
+                    hourCounts[hour] = (hourCounts[hour] || 0) + 1;
+                });
+            });
+        }
         const hourlyArr: HourlyData[] = Array.from({ length: 24 }, (_, i) => ({
             hour: i,
             count: hourCounts[i] || 0
@@ -164,12 +155,16 @@ export default function AnalyticsPage() {
         const pageStats: Record<string, { visits: number; conversations: number }> = {};
         evts.forEach(e => {
             if (e.page_url) {
-                const url = new URL(e.page_url).pathname;
-                if (!pageStats[url]) {
-                    pageStats[url] = { visits: 0, conversations: 0 };
-                }
-                if (e.event_type === 'widget_opened') {
-                    pageStats[url].visits++;
+                try {
+                    const url = new URL(e.page_url).pathname || '/';
+                    if (!pageStats[url]) {
+                        pageStats[url] = { visits: 0, conversations: 0 };
+                    }
+                    if (e.event_type === 'widget_opened') {
+                        pageStats[url].visits++;
+                    }
+                } catch (_) {
+                    // Invalid URL, skip
                 }
             }
         });
@@ -208,6 +203,7 @@ export default function AnalyticsPage() {
     const widgetCloses = events.filter(e => e.event_type === 'widget_closed').length;
 
     const peakHour = hourlyData.reduce((max, curr) => curr.count > max.count ? curr : max, { hour: 0, count: 0 });
+    const hasPeakData = peakHour.count > 0;
 
     if (loading) {
         return (
@@ -297,7 +293,7 @@ export default function AnalyticsPage() {
                             />
                             <StatCard
                                 label="Peak Hour"
-                                value={`${peakHour.hour}:00`}
+                                value={hasPeakData ? `${String(peakHour.hour).padStart(2, '0')}:00` : '—'}
                                 icon={<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />}
                                 color="yellow"
                             />
@@ -344,8 +340,8 @@ export default function AnalyticsPage() {
                                 <div className="flex items-end gap-1 h-40">
                                     {hourlyData.map((h, i) => {
                                         const maxCount = Math.max(...hourlyData.map(d => d.count), 1);
-                                        const height = (h.count / maxCount) * 100;
-                                        const isPeak = h.hour === peakHour.hour && h.count > 0;
+                                        const height = maxCount > 0 ? (h.count / maxCount) * 100 : 0;
+                                        const isPeak = hasPeakData && h.hour === peakHour.hour && h.count > 0;
                                         return (
                                             <div key={i} className="flex-1 flex flex-col items-center group relative">
                                                 <div
@@ -353,15 +349,18 @@ export default function AnalyticsPage() {
                                                     style={{ height: `${Math.max(height, 2)}%` }}
                                                 ></div>
                                                 {i % 4 === 0 && (
-                                                    <span className="text-xs text-gray-500 mt-1">{h.hour}:00</span>
+                                                    <span className="text-xs text-gray-500 mt-1">{String(h.hour).padStart(2, '0')}:00</span>
                                                 )}
-                                                <div className="absolute bottom-full mb-2 bg-gray-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
-                                                    {h.count} events at {h.hour}:00
+                                                <div className="absolute bottom-full mb-2 bg-gray-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
+                                                    {h.count} {h.count === 1 ? 'event' : 'events'} at {String(h.hour).padStart(2, '0')}:00
                                                 </div>
                                             </div>
                                         );
                                     })}
                                 </div>
+                                {!hasPeakData && (
+                                    <p className="text-gray-500 text-sm mt-4 text-center">No engagement data yet. Chat with the widget or open it on your site to see peak hours.</p>
+                                )}
                             </div>
 
                             {/* Word Cloud */}
